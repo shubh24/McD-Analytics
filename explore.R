@@ -36,4 +36,33 @@ ggplot(mcd, aes(x = factor(Category), y = Calcium....Daily.Value.)) +
   ggtitle("Violin plot -- Calcium") + 
   labs(x = "Category", y = "% Calcium of daily recommended")
 
-#play with calories
+#Top Calorific items
+head(mcd[with(mcd, order(by = -mcd$Calories)),"Item"])
+
+calories_agg = aggregate(Calories ~ Category, data = mcd, FUN = mean)
+#Assuming the recommended 2000 calories intake
+recommended_cal = 2000
+paste("Smoothies & Shakes calorific percentage --", round(calories_agg$Calories[calories_agg$Category == "Smoothies & Shakes"]/recommended_cal*100, 2))
+paste("Coffee & Tea calorific percentage --", round(calories_agg$Calories[calories_agg$Category == "Coffee & Tea"]/recommended_cal*100, 2))
+
+
+#Food worth a day
+mcd_percentage = mcd[, c( "Item", "Category", "Total.Fat....Daily.Value.", "Saturated.Fat....Daily.Value.", "Cholesterol....Daily.Value.", "Sodium....Daily.Value.", "Carbohydrates....Daily.Value.", "Dietary.Fiber....Daily.Value.", "Vitamin.A....Daily.Value.", "Vitamin.C....Daily.Value.", "Calcium....Daily.Value.", "Iron....Daily.Value.")]
+
+for (i in 3:length(names(mcd_percentage))){
+  mcd_percentage = mcd_percentage[mcd_percentage[[names(mcd_percentage)[i]]] < 100,]
+}
+
+mcd_percentage$rowsum = rowSums(mcd_percentage[, 3:12])
+
+category_min_sum = aggregate(rowsum ~ Category, data = mcd_percentage, FUN = min)
+mcd_min_selects = merge(category_min_sum, mcd_percentage, by = c("Category", "rowsum"))
+colSums(mcd_min_selects[, 4:13])
+
+category_max_sum = aggregate(rowsum ~ Category, data = mcd_percentage, FUN = max)
+mcd_max_selects = merge(category_max_sum, mcd_percentage, by = c("Category", "rowsum"))
+colSums(mcd_max_selects[, 4:13])
+
+#Cholestrol worth a day's share
+mcd[mcd$Cholesterol....Daily.Value. > 100, cbind("Item", "Cholesterol....Daily.Value.")]
+
