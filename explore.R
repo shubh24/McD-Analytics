@@ -1,5 +1,6 @@
 library(stringr)
 library(ggplot2)
+library(RecordLinkage)
 
 mcd = read.csv("menu.csv")
 mcd$Item = as.character(mcd$Item)
@@ -64,13 +65,15 @@ mcd[mcd$Cholesterol....Daily.Value. > 100, cbind("Item", "Cholesterol....Daily.V
 #Top Calorific items
 head(mcd[with(mcd, order(by = -mcd$Calories)),"Item"])
 
-mcd$cals_per_gram[mcd$food == TRUE] = mcd$Calories[mcd$food == TRUE]/mcd$Serving.Size[mcd$food == TRUE]
-head(mcd[with(mcd, order(by = -mcd$cals_per_gram)), "Item"]) #Top cals per gram
-head(mcd[with(mcd, order(by = mcd$cals_per_gram)), "Item"]) #Low cals per gram
+mcd$cals_per_unit = mcd$Calories/mcd$Serving.Size
 
-mcd$cals_per_ml[mcd$drink == TRUE] = mcd$Calories[mcd$drink == TRUE]/mcd$Serving.Size[mcd$drink == TRUE]
-head(mcd[with(mcd, order(by = -mcd$cals_per_ml)), "Item"]) #Top cals per gram
-head(mcd[with(mcd, order(by = mcd$cals_per_ml)), "Item"]) #Low cals per gram
+mcd_food = subset(mcd, mcd$food == TRUE)
+head(mcd_food[with(mcd_food, order(by = -mcd_food$cals_per_unit)), "Item"]) #Top cals per gram
+head(mcd_food[with(mcd_food, order(by = mcd_food$cals_per_unit)), "Item"]) #Low cals per gram
+
+mcd_drink = subset(mcd, mcd$drink == TRUE)
+head(mcd_drink[with(mcd_drink, order(by = -mcd_drink$cals_per_unit)), "Item"]) #Top cals per gram
+head(mcd_drink[with(mcd_drink, order(by = mcd_drink$cals_per_unit)), "Item"]) #Low cals per gram
 
 calories_agg = aggregate(Calories ~ Category, data = mcd, FUN = mean)
 #Assuming the recommended 2000 calories intake
@@ -79,4 +82,24 @@ paste("Smoothies & Shakes calorific percentage --", round(calories_agg$Calories[
 paste("Coffee & Tea calorific percentage --", round(calories_agg$Calories[calories_agg$Category == "Coffee & Tea"]/recommended_cal*100, 2))
 
 #SIMILAR ITEMS
-mcd_percentage[, 3:13] = mcd_percentage[, 3:13]/mcd_percentage$rowsum
+get_similarity = function(x, y){
+  return(x %*% y / sqrt(x%*%x * y%*%y))
+}
+
+mcd_percentage[, 3:12] = mcd_percentage[, 3:12]/mcd_percentage$rowsum
+mcd_percentage[is.na(mcd_percentage)] = 0
+
+sim_df = data.frame()
+
+for (i in 1:nrow(mcd_percentage)){
+  print(i)
+  for (j in i+1:nrow(mcd_percentage)){
+    sim = get_similarity(as.vector(as.matrix(mcd_percentage[i, 3:12])), as.vector(as.matrix(mcd_percentage[j, 3:12])))
+    
+    if (!is.na(sim) & sim > 0.997 & sim < 1 & adist(mcd_percentage$Item[i], mcd_percentage$Item[j]) > 6){
+      sim_df = rbind(sim_df, cbind(mcd_percentage$Item[i], mcd_percentage$Item[j], as.numeric(sim)))
+    }
+  }
+}
+
+sim_df$V3 = as.numeric(as.character(sim_df$V3))
